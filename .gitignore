@@ -1,3 +1,4 @@
 *.exe
 tempCodeRunnerFile.c
 .DS_Store
+.vscode

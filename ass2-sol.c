@@ -34,14 +34,16 @@
   Student General Misconduct may arise regardless of whether or not I personally
   make use of such solutions or sought benefit from such actions.
 
-  Signed by: [Enter your full name and student number here before submission]
-  Dated:     [Enter the date that you "signed" the declaration]
+  Signed by: Kacie Beckett 1452651
+  Dated:     03/09/2023
 */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <unistd.h>
+#include <ctype.h>
 
 /* #DEFINE'S -----------------------------------------------------------------*/
 #define SDELIM "==STAGE %d============================\n"   // stage delimiter
@@ -51,6 +53,7 @@
 #define NOCFMT "Number of characters: %d\n"                 // no. of chars
 #define NPSFMT "Number of states: %d\n"                     // no. of states
 #define TFQFMT "Total frequency: %d\n"                      // total frequency
+#define LINELEN 999
 
 #define CRTRNC '\r'                             // carriage return character
 
@@ -58,7 +61,7 @@
 typedef struct state state_t;   // a state in an automaton
 typedef struct node  node_t;    // a node in a linked list
 
-struct node {                   // a node in a linked list of transitions has
+struct node{                   // a node in a linked list of transitions has
     char*           str;        // ... a transition string
     state_t*        state;      // ... the state reached via the string, and
     node_t*         next;       // ... a link to the next node in the list.
@@ -81,17 +84,49 @@ typedef struct {                // an automaton consists of
     unsigned int    nid;        // ... the identifier of the next new state.
 } automaton_t;
 
+
+
 /* USEFUL FUNCTIONS ----------------------------------------------------------*/
-int mygetchar(void);            // getchar() that skips carriage returns
+int fileno(FILE *);
+int mygetchar(void); 
+int read_line(char *line, int maxlen);          // getchar() that skips carriage returns
 
 /* WHERE IT ALL HAPPENS ------------------------------------------------------*/
+
+/*
+To-Do List:
+Stage 0:
+- take the chars from each line and put them into a tree 
+> first create a root node
+> then check each node whether any node off of root contains the char as data
+> if not then add a node off root containing the data and continue adding the nodes until end of line
+> if yes increment frequency of that node and go to the next node and check
+<repeat these steps>
+
+now generate the information required by iterating through the array in depth first order
+Stage 1:
+
+*/
+
 int main(int argc, char *argv[]) {
-    // Message from Artem: The proposed in this skeleton file #define's,
-    // typedef's, and struct's are the subsets of those from my sample solution
-    // to this assignment. You can decide to use them in your program, or if
-    // you find them confusing, you can remove them and implement your solution
-    // from scratch. I will share my sample solution with you at the end of
-    // the subject.
+    char line[LINELEN + 1] = {0};
+    int *root = NULL;
+
+    while (read_line(line, LINELEN)) {
+        if (strlen(line) > 0 && line[0] != '\0') {
+            //printf("boop");
+        } else {
+            //switch to the next stage
+        }
+    }
+
+    for(int i = 0; i < argc; i++){
+        printf("\ni:%d %s\n", i,argv[i]);
+    }
+
+
+
+
     return EXIT_SUCCESS;        // algorithms are fun!!!
 }
 
@@ -105,4 +140,37 @@ int mygetchar() {
     return c;
 }
 
-/* THE END -------------------------------------------------------------------*/
+// Reads a line of input into the array passed as argument,
+// returns false if there is no input available.
+// All whitespace characters are removed on the way through.
+// ATTRIBUTION: ALISTAIR MOFFAT ASSIGNMENT 1 2023
+//
+int read_line(char *line, int maxlen) {
+    int i=0, c;
+    while (((c=mygetchar())!=EOF) && (c!='\n')) {
+        if (i<maxlen && !isspace(c)) {
+            line[i++] = c;
+        }
+    }
+    line[i] = '\0';
+    // then, if the input is coming from a file or the output
+    // is going to a file, it is helpful to echo the input line
+    // and record what the command was 
+    if (!isatty(fileno(stdin)) || !isatty(fileno(stdout))) {
+        printf("%s\n", line);
+    }
+    return ((i>0) || (c!=EOF));
+}
+
+
+void add_node(char current, int index){
+
+
+}
+
+void get_new_node(int data){
+
+
+}
+
+// Algorithms are Fun!!!
