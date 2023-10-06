@@ -40,6 +40,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <assert.h>
 #include <string.h>
 #include <unistd.h>
@@ -55,7 +56,8 @@
 #define TFQFMT "Total frequency: %d\n"                      // total frequency
 #define LINELEN 999
 
-#define CRTRNC '\r'                             // carriage return character
+#define CRTRNC '\r'       // carriage return character
+
 
 /* TYPE DEFINITIONS ----------------------------------------------------------*/
 typedef struct state state_t;   // a state in an automaton
@@ -75,7 +77,7 @@ typedef struct {                // a linked list consists of
 struct state {                  // a state in an automaton is characterized by
     unsigned int    id;         // ... an identifier,
     unsigned int    freq;       // ... frequency of traversal,
-    int             visited;    // ... visited status flag, and
+    bool            visited;    // ... visited status flag, and
     list_t*         outputs;    // ... a list of output states.
 };
 
@@ -85,32 +87,23 @@ typedef struct {                // an automaton consists of
 } automaton_t;
 
 
-
 /* USEFUL FUNCTIONS ----------------------------------------------------------*/
 int fileno(FILE *);
-int mygetchar(void); 
-int read_line(char *line, int maxlen);          // getchar() that skips carriage returns
+int mygetchar(void);  // getchar() that skips carriage returns
+int read_line(char *line, int maxlen); 
+automaton_t *init_automaton(void);  
+void search_for_state(list_t* outputs, char* str, int id);   
+state_t *create_state(int id); 
+node_t *create_node(char *str, int id);
 
 /* WHERE IT ALL HAPPENS ------------------------------------------------------*/
 
-/*
-To-Do List:
-Stage 0:
-- take the chars from each line and put them into a tree 
-> first create a root node
-> then check each node whether any node off of root contains the char as data
-> if not then add a node off root containing the data and continue adding the nodes until end of line
-> if yes increment frequency of that node and go to the next node and check
-<repeat these steps>
 
-now generate the information required by iterating through the array in depth first order
-Stage 1:
-
-*/
 
 int main(int argc, char *argv[]) {
     char line[LINELEN + 1] = {0};
-    int *root = NULL;
+    automaton_t *automaton;
+    automaton = init_automaton();
 
     while (read_line(line, LINELEN)) {
         if (strlen(line) > 0 && line[0] != '\0') {
@@ -140,6 +133,57 @@ int mygetchar() {
     return c;
 }
 
+automaton_t *init_automaton(void){
+    automaton_t *automaton;
+    automaton = (automaton_t*) malloc(sizeof(*automaton));
+    assert(automaton != NULL);
+    automaton->ini = create_state(0);
+    automaton->nid = 1;
+    
+
+
+    return automaton;
+}
+
+void search_for_state(list_t *outputs , char* str, int id) {
+    if (outputs->head == NULL){
+        // create node as we found a place for it
+        node_t *node;
+        node = create_node(str,id);
+
+    } else {
+        // go deeper
+
+    }
+
+}
+
+state_t *create_state(int id) {
+    state_t *state;
+    state = (state_t*) malloc(sizeof(*state));
+    assert(state != NULL);
+    state->freq = 0;
+    state->id = id;
+    state->visited = false;
+    state->outputs->head = NULL;
+    state->outputs->tail = NULL;
+
+}
+
+node_t *create_node(char *str, int id) {
+    node_t *node;
+    node = (node_t*) malloc(sizeof(*node));
+    assert(node != NULL);
+
+    node->str = str;
+    node->state = add_state(id);
+    node->next = NULL;
+
+    return node;
+}
+
+
+
 // Reads a line of input into the array passed as argument,
 // returns false if there is no input available.
 // All whitespace characters are removed on the way through.
@@ -163,14 +207,6 @@ int read_line(char *line, int maxlen) {
 }
 
 
-void add_node(char current, int index){
 
-
-}
-
-void get_new_node(int data){
-
-
-}
 
 // Algorithms are Fun!!!
