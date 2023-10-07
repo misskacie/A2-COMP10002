@@ -1,0 +1,4 @@
+==STAGE 1============================
+Number of statements: 8
+Number of characters: 50
+Number of states: 29

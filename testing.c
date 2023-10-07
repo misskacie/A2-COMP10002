@@ -16,7 +16,7 @@
 #define LINELEN 999
 
 #define CRTRNC '\r'                             // carriage return character
-
+#define NULLTERM '\0'
 /* TYPE DEFINITIONS ----------------------------------------------------------*/
 typedef struct state state_t;   // a state in an automaton
 typedef struct node  node_t;    // a node in a linked list
@@ -55,23 +55,14 @@ int read_line(char *line, int maxlen);          // getchar() that skips carriage
 
 
 int main(int argc, char *argv[]) {
-    char line[LINELEN + 1] = {0};
-    int *root = NULL;
-
-    while (read_line(line, LINELEN)) {
-        if (strlen(line) > 0 && line[0] != '\0') {
-            //printf("boop");
-        } else {
-            //switch to the next stage
-        }
+    char str[2] = "a";
+    char c = 'a';
+    char str2[2];
+    str2[0] = c;
+    str2[1] = NULLTERM;
+    if(!strcmp(str, str2)){
+        printf("success");
     }
-
-    for(int i = 0; i < argc; i++){
-        printf("\ni:%d %s\n", i,argv[i]);
-    }
-
-
-
 
     return EXIT_SUCCESS;        // algorithms are fun!!!
 }

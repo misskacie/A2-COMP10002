@@ -54,16 +54,16 @@
 #define NOCFMT "Number of characters: %d\n"                 // no. of chars
 #define NPSFMT "Number of states: %d\n"                     // no. of states
 #define TFQFMT "Total frequency: %d\n"                      // total frequency
-#define LINELEN 999
 
+#define ROOTID 0
 #define CRTRNC '\r'       // carriage return character
-
+#define NULTRM '\0' // used to mark the end of a string
 
 /* TYPE DEFINITIONS ----------------------------------------------------------*/
 typedef struct state state_t;   // a state in an automaton
 typedef struct node  node_t;    // a node in a linked list
 
-struct node{                   // a node in a linked list of transitions has
+struct node {                   // a node in a linked list of transitions has
     char*           str;        // ... a transition string
     state_t*        state;      // ... the state reached via the string, and
     node_t*         next;       // ... a link to the next node in the list.
@@ -87,38 +87,36 @@ typedef struct {                // an automaton consists of
 } automaton_t;
 
 
-/* USEFUL FUNCTIONS ----------------------------------------------------------*/
+/*----------------------------------------------------------------------------*/
 int fileno(FILE *);
 int mygetchar(void);  // getchar() that skips carriage returns
-int read_line(char *line, int maxlen); 
-automaton_t *init_automaton(void);  
-void search_for_state(list_t* outputs, char* str, int id);   
+automaton_t *init_automaton(void);     
 state_t *create_state(int id); 
+list_t *create_list(void);
 node_t *create_node(char *str, int id);
+state_t *insert_at_tail(automaton_t *automaton, state_t *state, char *str);
+state_t *insert_state(automaton_t *automaton, state_t *state, char *str);
+int read_line_into_automaton(automaton_t *automaton, int *charcount);
+void print_state(state_t *state, char *message);
+/*----------------------------------------------------------------------------*/
 
-/* WHERE IT ALL HAPPENS ------------------------------------------------------*/
 
 
-
-int main(int argc, char *argv[]) {
-    char line[LINELEN + 1] = {0};
+int 
+main(int argc, char *argv[]) {
     automaton_t *automaton;
     automaton = init_automaton();
+    int stage0_char_count = 0;
 
-    while (read_line(line, LINELEN)) {
-        if (strlen(line) > 0 && line[0] != '\0') {
-            //printf("boop");
-        } else {
-            //switch to the next stage
-        }
+    while (read_line_into_automaton(automaton, &stage0_char_count)) {
+        //printf("line read=================================\n");
+        //print_state(automaton->ini,"main");
     }
-
-    for(int i = 0; i < argc; i++){
-        printf("\ni:%d %s\n", i,argv[i]);
-    }
-
-
-
+    printf(SDELIM, 1);
+    printf(NOSFMT,automaton->ini->freq);
+    printf(NOCFMT, stage0_char_count);
+    printf(NPSFMT,automaton->nid);
+    
 
     return EXIT_SUCCESS;        // algorithms are fun!!!
 }
@@ -127,84 +125,167 @@ int main(int argc, char *argv[]) {
 
 // An improved version of getchar(); skips carriage return characters.
 // NB: Adapted version of the mygetchar() function by Alistair Moffat
-int mygetchar() {
+int 
+mygetchar() {
     int c;
     while ((c=getchar())==CRTRNC);
     return c;
 }
 
-automaton_t *init_automaton(void){
+automaton_t 
+*init_automaton(void){
     automaton_t *automaton;
     automaton = (automaton_t*) malloc(sizeof(*automaton));
     assert(automaton != NULL);
-    automaton->ini = create_state(0);
+    automaton->ini = create_state(ROOTID); //root state has id 0
     automaton->nid = 1;
-    
-
-
     return automaton;
 }
 
-void search_for_state(list_t *outputs , char* str, int id) {
-    if (outputs->head == NULL){
-        // create node as we found a place for it
-        node_t *node;
-        node = create_node(str,id);
-
-    } else {
-        // go deeper
-
-    }
-
-}
-
-state_t *create_state(int id) {
+state_t 
+*create_state(int id) {
     state_t *state;
     state = (state_t*) malloc(sizeof(*state));
     assert(state != NULL);
     state->freq = 0;
     state->id = id;
     state->visited = false;
-    state->outputs->head = NULL;
-    state->outputs->tail = NULL;
-
+    state->outputs = create_list();
+    
+    return state;
 }
 
-node_t *create_node(char *str, int id) {
+// Adapted from listops.c to match style
+// Credit: Alistair Moffat
+list_t 
+*create_list(void) {
+    list_t *list;
+	list = (list_t*)malloc(sizeof(*list));
+	assert(list!=NULL);
+	list->head = list->tail = NULL;
+	return list;
+}
+
+
+node_t 
+*create_node(char *str, int id) {
     node_t *node;
     node = (node_t*) malloc(sizeof(*node));
     assert(node != NULL);
 
     node->str = str;
-    node->state = add_state(id);
+    node->state = create_state(id);
     node->next = NULL;
 
     return node;
 }
 
+// Adapted from listops.c 
+// Credit: Alistair Moffat
+state_t 
+*insert_at_tail(automaton_t *automaton, state_t *state, char *str) {
+    node_t *new_node;
+    new_node = create_node(str, automaton->nid);
+    automaton->nid += 1;
 
+    if (state->outputs->tail == NULL){
+        //first insertion
+        state->outputs->head = state->outputs->tail = new_node;
+        state->visited = true;
+    } else {
+        state->outputs->tail->next = new_node;
+        state->outputs->tail = new_node;
+    }
 
-// Reads a line of input into the array passed as argument,
-// returns false if there is no input available.
-// All whitespace characters are removed on the way through.
-// ATTRIBUTION: ALISTAIR MOFFAT ASSIGNMENT 1 2023
-//
-int read_line(char *line, int maxlen) {
-    int i=0, c;
-    while (((c=mygetchar())!=EOF) && (c!='\n')) {
-        if (i<maxlen && !isspace(c)) {
-            line[i++] = c;
-        }
-    }
-    line[i] = '\0';
-    // then, if the input is coming from a file or the output
-    // is going to a file, it is helpful to echo the input line
-    // and record what the command was 
-    if (!isatty(fileno(stdin)) || !isatty(fileno(stdout))) {
-        printf("%s\n", line);
-    }
-    return ((i>0) || (c!=EOF));
+    state->freq += 1;
+
+    return new_node->state;
 }
+
+
+
+state_t 
+*insert_state(automaton_t *automaton, state_t *state, char *str) {
+    char *newstr;
+    newstr = (char*) malloc(2*sizeof(*newstr));
+    strcpy(newstr,str);
+
+    node_t *current_node; 
+    current_node = state->outputs->head;
+
+
+    
+    bool flag = (current_node != NULL) ? true : false;
+    while (flag){
+        if (!strcmp(current_node->str, str)) {
+            state->freq += 1;
+            //print_state(current_node->state);
+            return current_node->state; 
+        }
+        // guard clause
+        if (current_node->next == NULL) {
+            break;
+        }
+        current_node = current_node->next;
+    }
+    // node with that string doesnt exist so make one
+    
+    state_t *newstate;
+    //printf("new %s\n",newstr);
+    newstate = insert_at_tail(automaton, state, newstr);
+    //print_state(state,"insertstate");
+    return newstate;
+
+           
+}
+
+
+int
+read_line_into_automaton(automaton_t *automaton, int *charcount) {
+    char c;
+    char str[2];
+    state_t *current_state;
+    current_state = automaton->ini; 
+    bool flag = false;
+    
+    while (((c=mygetchar()) != EOF) && (c != '\n')) {
+        *charcount += 1;
+           
+            str[0] = c;
+            str[1] = NULTRM;
+            //printf("%s\n",str);
+            //print_state(automaton->ini,"readline");
+            current_state = insert_state(automaton, current_state, str);
+            //print_state(automaton->ini,"readlineafter");
+        
+        flag = true;
+    }
+    return (flag);
+}
+
+void 
+print_state(state_t *state, char *message){
+    printf("\n");
+    printf("%s\n",message);
+    printf("STATE-----------------\n");
+    printf("id: %d\n",state->id);
+    printf("freq: %d\n",state->freq);
+    printf("visted: %d\n",state->visited);
+    node_t *currentnode;
+    currentnode = state->outputs->head;
+    
+    while(state->outputs->head != NULL){
+        printf("encoded state: %s\n",currentnode->str);
+        if(currentnode->next == NULL){
+            break;
+        }
+        currentnode = currentnode->next;
+    }
+    printf("--------------------\n");
+    printf("\n");
+
+}
+
 
 
 
