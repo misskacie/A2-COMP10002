@@ -96,6 +96,7 @@ list_t *create_list(void);
 node_t *create_node(char *str, int id);
 state_t *insert_at_tail(automaton_t *automaton, state_t *state, char *str);
 state_t *insert_state(automaton_t *automaton, state_t *state, char *str);
+state_t *insert_sorted(automaton_t *automaton, state_t *state, char *str);
 int read_line_into_automaton(automaton_t *automaton, int *charcount);
 void print_state(state_t *state, char *message);
 /*----------------------------------------------------------------------------*/
@@ -110,8 +111,9 @@ main(int argc, char *argv[]) {
 
     while (read_line_into_automaton(automaton, &stage0_char_count)) {
         //printf("line read=================================\n");
-        //print_state(automaton->ini,"main");
+        
     }
+    print_state(automaton->ini,"main");
     printf(SDELIM, 1);
     printf(NOSFMT,automaton->ini->freq);
     printf(NOCFMT, stage0_char_count);
@@ -205,6 +207,53 @@ state_t
 
 
 state_t 
+*insert_sorted(automaton_t *automaton, state_t *state, char *str) {
+    node_t *new_node;
+    new_node = create_node(str, automaton->nid);
+    automaton->nid += 1;
+
+    if (state->outputs->tail == NULL){
+        //first insertion
+        state->outputs->head = state->outputs->tail = new_node;
+        state->visited = true;
+    } else {
+        
+        if (strcmp(str, state->outputs->head->str) < 0) {
+            // check if larger than head and insert at head
+            new_node->next = state->outputs->head;
+            state->outputs->head = new_node;
+            
+        } else if (strcmp(str, state->outputs->tail->str) > 0) {
+            // check if larger than tail and insert at tail
+            state->outputs->tail->next = new_node;
+            state->outputs->tail = new_node;
+            
+        } else {
+
+
+        node_t *currentnode;      
+        currentnode = state->outputs->head;
+        
+        
+        while(currentnode->next != NULL && (str, currentnode->next->str) > 0){
+            currentnode = currentnode->next;
+        }
+        new_node->next = currentnode->next;
+        currentnode->next = new_node;
+
+        printf("%s\n",str);
+        print_state(automaton->ini,"insert sorted");
+        }
+    }
+
+    state->freq += 1;
+
+    return new_node->state;
+}
+
+
+
+state_t 
 *insert_state(automaton_t *automaton, state_t *state, char *str) {
     char *newstr;
     newstr = (char*) malloc(2*sizeof(*newstr));
@@ -232,7 +281,8 @@ state_t
     
     state_t *newstate;
     //printf("new %s\n",newstr);
-    newstate = insert_at_tail(automaton, state, newstr);
+    //newstate = insert_at_tail(automaton, state, newstr);
+    newstate = insert_sorted(automaton, state, newstr);
     //print_state(state,"insertstate");
     return newstate;
 
@@ -274,11 +324,8 @@ print_state(state_t *state, char *message){
     node_t *currentnode;
     currentnode = state->outputs->head;
     
-    while(state->outputs->head != NULL){
+    while(currentnode->next != NULL){
         printf("encoded state: %s\n",currentnode->str);
-        if(currentnode->next == NULL){
-            break;
-        }
         currentnode = currentnode->next;
     }
     printf("--------------------\n");
