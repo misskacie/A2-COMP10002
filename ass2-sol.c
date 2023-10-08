@@ -94,11 +94,12 @@ automaton_t *init_automaton(void);
 state_t *create_state(int id); 
 list_t *create_list(void);
 node_t *create_node(char *str, int id);
-state_t *insert_at_tail(automaton_t *automaton, state_t *state, char *str);
 state_t *insert_state(automaton_t *automaton, state_t *state, char *str);
-state_t *insert_sorted(automaton_t *automaton, state_t *state, char *str);
+state_t *sorted_list_insert(automaton_t *automaton, state_t *state, char *str);
 int read_line_into_automaton(automaton_t *automaton, int *charcount);
 void print_state(state_t *state, char *message);
+void recursive_traverse(state_t *state);
+void traverse_tree(state_t *state);
 /*----------------------------------------------------------------------------*/
 
 
@@ -113,7 +114,8 @@ main(int argc, char *argv[]) {
         //printf("line read=================================\n");
         
     }
-    print_state(automaton->ini,"main");
+    //print_state(automaton->ini,"main");
+    //traverse_tree(automaton->ini);
     printf(SDELIM, 1);
     printf(NOSFMT,automaton->ini->freq);
     printf(NOCFMT, stage0_char_count);
@@ -133,6 +135,34 @@ mygetchar() {
     while ((c=getchar())==CRTRNC);
     return c;
 }
+// Adapted version from Alistair Moffat's recursive traverse in treeops.c
+void
+recursive_traverse(state_t *state) {
+	node_t *current_node;
+    current_node = state->outputs->head;
+    printf("%d\n", state->id);
+    if (current_node) {
+        while(true){
+            recursive_traverse(current_node->state);
+            if (current_node->next ==  NULL) {
+                break;
+            }
+            current_node = current_node->next;
+        }
+        
+		
+	}
+}
+
+// Author :ALISTAIR MOFFAT
+/* Applies the "action" at every node in the tree, in
+   the order determined by the cmp function. */
+void
+traverse_tree(state_t *state) {
+	assert(state != NULL);
+	recursive_traverse(state);
+}
+
 
 automaton_t 
 *init_automaton(void){
@@ -169,6 +199,8 @@ list_t
 }
 
 
+// Adapted from listops.c
+// Credit: Alistair Moffat
 node_t 
 *create_node(char *str, int id) {
     node_t *node;
@@ -182,72 +214,42 @@ node_t
     return node;
 }
 
-// Adapted from listops.c 
-// Credit: Alistair Moffat
+/* when inserting ascii characters to the output list put them in sorted order 
+    REFERENCE: https://www.geeksforgeeks.org/given-a-linked-list-which-is-
+        sorted-how-will-you-insert-in-sorted-way/
+*/
 state_t 
-*insert_at_tail(automaton_t *automaton, state_t *state, char *str) {
+*sorted_list_insert(automaton_t *automaton, state_t *state, char *str) {
     node_t *new_node;
     new_node = create_node(str, automaton->nid);
     automaton->nid += 1;
-
-    if (state->outputs->tail == NULL){
-        //first insertion
-        state->outputs->head = state->outputs->tail = new_node;
-        state->visited = true;
-    } else {
-        state->outputs->tail->next = new_node;
-        state->outputs->tail = new_node;
-    }
-
     state->freq += 1;
 
-    return new_node->state;
-}
-
-
-
-state_t 
-*insert_sorted(automaton_t *automaton, state_t *state, char *str) {
-    node_t *new_node;
-    new_node = create_node(str, automaton->nid);
-    automaton->nid += 1;
-
     if (state->outputs->tail == NULL){
         //first insertion
         state->outputs->head = state->outputs->tail = new_node;
         state->visited = true;
-    } else {
+        return new_node->state;
+    } 
         
-        if (strcmp(str, state->outputs->head->str) < 0) {
-            // check if larger than head and insert at head
-            new_node->next = state->outputs->head;
-            state->outputs->head = new_node;
-            
-        } else if (strcmp(str, state->outputs->tail->str) > 0) {
-            // check if larger than tail and insert at tail
-            state->outputs->tail->next = new_node;
-            state->outputs->tail = new_node;
-            
-        } else {
-
-
+    if (strcmp(str, state->outputs->head->str) < 0) {
+        // check if smaller than head and insert at head
+        new_node->next = state->outputs->head;
+        state->outputs->head = new_node;
+        
+    } else {
         node_t *currentnode;      
         currentnode = state->outputs->head;
         
-        
-        while(currentnode->next != NULL && (str, currentnode->next->str) > 0){
+        while(currentnode->next != NULL && 
+            strcmp(str, currentnode->next->str) > 0) {
             currentnode = currentnode->next;
         }
         new_node->next = currentnode->next;
         currentnode->next = new_node;
 
-        printf("%s\n",str);
-        print_state(automaton->ini,"insert sorted");
-        }
     }
-
-    state->freq += 1;
-
+    //print_state(automaton->ini,"insert sorted");
     return new_node->state;
 }
 
@@ -281,13 +283,13 @@ state_t
     
     state_t *newstate;
     //printf("new %s\n",newstr);
-    //newstate = insert_at_tail(automaton, state, newstr);
-    newstate = insert_sorted(automaton, state, newstr);
+    newstate = sorted_list_insert(automaton, state, newstr);
     //print_state(state,"insertstate");
     return newstate;
 
            
 }
+
 
 
 int
@@ -314,6 +316,13 @@ read_line_into_automaton(automaton_t *automaton, int *charcount) {
 }
 
 void 
+replay(state_t *state) {
+
+
+
+}
+
+void 
 print_state(state_t *state, char *message){
     printf("\n");
     printf("%s\n",message);
@@ -324,8 +333,11 @@ print_state(state_t *state, char *message){
     node_t *currentnode;
     currentnode = state->outputs->head;
     
-    while(currentnode->next != NULL){
+    while(true){
         printf("encoded state: %s\n",currentnode->str);
+        if (currentnode->next == NULL){
+            break;
+        }
         currentnode = currentnode->next;
     }
     printf("--------------------\n");
