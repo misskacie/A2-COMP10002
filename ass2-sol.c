@@ -88,7 +88,6 @@ typedef struct {                // an automaton consists of
 
 
 /*FUNCTION PROTOTYPES--------------------------------------------------------*/
-int fileno(FILE *);
 int mygetchar(void);  // getchar() that skips carriage returns
 automaton_t *init_automaton(void);     
 state_t *create_state(int id); 
@@ -102,12 +101,16 @@ void recursive_traverse(state_t *state);
 void traverse_tree(state_t *state);
 int replay(automaton_t *automaton, state_t *state);
 state_t *find_state_match(state_t *state, char *str);
-state_t *select_next_state(state_t *state);
+node_t *select_next_state(state_t *state);
 bool traverse_state(state_t *state, char *str);
 int replay_automaton(automaton_t *automaton);
 char *change_string_size(char *str, int new_length);
 char *create_string(int length);
 void print_ellipses(int *char_count);
+int compress_automaton(automaton_t *automaton);
+void find_next_compression(state_t *state);
+void free_automaton(automaton_t *automaton);
+void recursive_free_automaton(state_t *state);
 /*----------------------------------------------------------------------------*/
 
 int 
@@ -116,20 +119,24 @@ main(int argc, char *argv[]) {
     automaton = init_automaton();
     int stage0_char_count = 0;
 
-    while(read_line_into_automaton(automaton, &stage0_char_count));
-    
-    
-    //print_state(automaton->ini,"main");
-    //traverse_tree(automaton->ini);
+
     printf(SDELIM, 0);
+    while(read_line_into_automaton(automaton, &stage0_char_count));
     printf(NOSFMT,automaton->ini->freq);
     printf(NOCFMT, stage0_char_count);
     printf(NPSFMT,automaton->nid);
-    printf(SDELIM, 1);
-    while(replay_automaton(automaton));
-    
-    
 
+    
+    //recursive_traverse(automaton->ini);
+
+    printf(SDELIM, 1);
+    while(replay_automaton(automaton)){
+        printf("\n");
+    }
+
+    printf(SDELIM, 2);
+    
+    free_automaton(automaton);
     return EXIT_SUCCESS;        // algorithms are fun!!!
 }
 
@@ -144,15 +151,6 @@ mygetchar() {
     return c;
 }
 
-// Author :ALISTAIR MOFFAT
-/* Applies the "action" at every node in the tree, in
-   the order determined by the cmp function. */
-void
-traverse_tree(state_t *state) {
-	assert(state != NULL);
-	recursive_traverse(state);
-}
-
 // Adapted version from Alistair Moffat's recursive traverse in treeops.c
 // Assumes a low->high sorted ASCII-betically connections linked list and 
 // iterates through each output
@@ -162,17 +160,14 @@ recursive_traverse(state_t *state) {
     current_node = state->outputs->head;
     printf("%d\n", state->id);
     if (current_node) {
-        while(true){
+        while(current_node != NULL){
             recursive_traverse(current_node->state);
-            if (current_node->next ==  NULL) {
-                break;
-            }
             current_node = current_node->next;
         }
 	}
 }
 
-/*MEMORY ALLOCATION FUNCTIONS-------------------------------------------------*/
+/*MEMORY MANAGEMENT FUNCTIONS-------------------------------------------------*/
 
 automaton_t 
 *init_automaton(void){
@@ -239,13 +234,40 @@ char
 }
 
 char
-*change_string_size(char *str, int new_length) {
-    return realloc(str, new_length);
+*change_string_size(char *str, int new_size) {
+    return realloc(str, sizeof(char) *new_size);
 }
 
 char
-*create_string(int length) {
-    return (char*) malloc(sizeof(char) * length);
+*create_string(int size) {
+    return (char*) malloc(sizeof(char) * size);
+}
+
+// Credit: Alistair Moffat, Adapted from 'treeops.c'
+// Wrapper function to free the automaton type
+void
+free_automaton(automaton_t *automaton){
+    assert(automaton != NULL);
+    recursive_free_automaton(automaton->ini);
+    free(automaton);
+}
+
+// Credit: Alistair Moffat, Adapted from 'treeops.c'
+void
+recursive_free_automaton(state_t *state) {
+    node_t *current_node, *tmp;
+    current_node = state->outputs->head;
+    
+    if (current_node) {
+        while(current_node != NULL){
+            recursive_free_automaton(current_node->state);
+            tmp = current_node;
+            current_node = current_node->next;
+            free(tmp);
+        }
+	}
+    free(state->outputs);
+    free(state);
 }
 /*----------------------------------------------------------------------------*/
 
@@ -333,7 +355,7 @@ state_t
 /* Because the output list for each state is sorted ASCII-beticaly, choose the 
    rightmost occurance of the highest frequency. Operation is O(n)
 */
-state_t 
+node_t 
 *select_next_state(state_t *state){
     if (state->outputs->head == NULL) {
         // linked list is empty so no next state.
@@ -347,7 +369,7 @@ state_t
         }
         current_node = current_node->next;
     }
-    return largest_node->state;
+    return largest_node;
 }
 
 int
@@ -388,41 +410,72 @@ replay_automaton(automaton_t *automaton) {
     int char_count = 0;
     bool flag = false;
 
-    state_t *current_state;
-    current_state = automaton->ini; 
-
+    state_t *current_state, *tmp_state;
+    current_state = tmp_state = automaton->ini; 
+    
     while (((c=mygetchar()) != EOF)) {
         if (c == '\n') {
             if (flag == true) {
                 print_ellipses(&char_count);
-                printf("\n");
+                
             }
             break;
             // return flag;
         }
-        if ((current_state == NULL && char_count <= 37)) {
+        if ((tmp_state == NULL && char_count < 37)) {
             print_ellipses(&char_count);
+            
         }
         flag = true;
         *(str)= c;
         *(str + 1)= '\0';
        
+        
+        tmp_state = find_state_match(current_state, str);
+        if (tmp_state != NULL) {
+            current_state = tmp_state;
+        }
 
-        current_state = find_state_match(current_state, str);
-        char_count++;
-        if (char_count <= 37) {
+        
+        if (char_count < 37) {
             printf("%s",str);
           //  printf(" %d\n",char_count);
         }
+        char_count++;
     }
-   
     
-    if(char_count < 37 && flag == true) {
-        //select_next_state(state)
-
+    
+    if(char_count < 37 && flag == true && current_state == tmp_state) {
+        
+        node_t *current_node;
+        current_node = select_next_state(current_state);
+        while((current_node != NULL)){
+            printf("%s",current_node->str);
+            
+            current_node = select_next_state(current_node->state);
+         }
+        
     }
+    
    
     return flag;
+}
+// currenlty just the same as recursive traverse
+void
+find_next_compression(state_t *state) {
+	node_t *current_node;
+    current_node = state->outputs->head;
+    printf("%d\n", state->id);
+    if (current_node) {
+        while(current_node != NULL){
+            recursive_traverse(current_node->state);
+            current_node = current_node->next;
+        }
+	}
+}
+
+int 
+compress_aautomaton(automaton_t *automaton) {
 }
 
 
