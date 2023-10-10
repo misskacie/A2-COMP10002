@@ -1,5 +1,5 @@
-e
-d
+elephant
+dog
 f
 v
 a
@@ -7,6 +7,13 @@ b
 c
 r
 n
-
+dog
+dog
+rock
+rock
+rock
+river
+dog
+dog
 
 

@@ -87,7 +87,7 @@ typedef struct {                // an automaton consists of
 } automaton_t;
 
 
-/*----------------------------------------------------------------------------*/
+/*FUNCTION PROTOTYPES--------------------------------------------------------*/
 int fileno(FILE *);
 int mygetchar(void);  // getchar() that skips carriage returns
 automaton_t *init_automaton(void);     
@@ -100,9 +100,15 @@ int read_line_into_automaton(automaton_t *automaton, int *charcount);
 void print_state(state_t *state, char *message);
 void recursive_traverse(state_t *state);
 void traverse_tree(state_t *state);
+int replay(automaton_t *automaton, state_t *state);
+state_t *find_state_match(state_t *state, char *str);
+state_t *select_next_state(state_t *state);
+bool traverse_state(state_t *state, char *str);
+int replay_automaton(automaton_t *automaton);
+char *change_string_size(char *str, int new_length);
+char *create_string(int length);
+void print_ellipses(int *char_count);
 /*----------------------------------------------------------------------------*/
-
-
 
 int 
 main(int argc, char *argv[]) {
@@ -110,16 +116,18 @@ main(int argc, char *argv[]) {
     automaton = init_automaton();
     int stage0_char_count = 0;
 
-    while (read_line_into_automaton(automaton, &stage0_char_count)) {
-        //printf("line read=================================\n");
-        
-    }
+    while(read_line_into_automaton(automaton, &stage0_char_count));
+    
+    
     //print_state(automaton->ini,"main");
     //traverse_tree(automaton->ini);
-    printf(SDELIM, 1);
+    printf(SDELIM, 0);
     printf(NOSFMT,automaton->ini->freq);
     printf(NOCFMT, stage0_char_count);
     printf(NPSFMT,automaton->nid);
+    printf(SDELIM, 1);
+    while(replay_automaton(automaton));
+    
     
 
     return EXIT_SUCCESS;        // algorithms are fun!!!
@@ -135,7 +143,19 @@ mygetchar() {
     while ((c=getchar())==CRTRNC);
     return c;
 }
+
+// Author :ALISTAIR MOFFAT
+/* Applies the "action" at every node in the tree, in
+   the order determined by the cmp function. */
+void
+traverse_tree(state_t *state) {
+	assert(state != NULL);
+	recursive_traverse(state);
+}
+
 // Adapted version from Alistair Moffat's recursive traverse in treeops.c
+// Assumes a low->high sorted ASCII-betically connections linked list and 
+// iterates through each output
 void
 recursive_traverse(state_t *state) {
 	node_t *current_node;
@@ -149,36 +169,30 @@ recursive_traverse(state_t *state) {
             }
             current_node = current_node->next;
         }
-        
-		
 	}
 }
 
-// Author :ALISTAIR MOFFAT
-/* Applies the "action" at every node in the tree, in
-   the order determined by the cmp function. */
-void
-traverse_tree(state_t *state) {
-	assert(state != NULL);
-	recursive_traverse(state);
-}
-
+/*MEMORY ALLOCATION FUNCTIONS-------------------------------------------------*/
 
 automaton_t 
 *init_automaton(void){
     automaton_t *automaton;
     automaton = (automaton_t*) malloc(sizeof(*automaton));
     assert(automaton != NULL);
+
     automaton->ini = create_state(ROOTID); //root state has id 0
     automaton->nid = 1;
+
     return automaton;
 }
+
 
 state_t 
 *create_state(int id) {
     state_t *state;
     state = (state_t*) malloc(sizeof(*state));
     assert(state != NULL);
+
     state->freq = 0;
     state->id = id;
     state->visited = false;
@@ -187,20 +201,20 @@ state_t
     return state;
 }
 
-// Adapted from listops.c to match style
-// Credit: Alistair Moffat
+
+// Credit: Alistair Moffat, 'listops.c'
 list_t 
 *create_list(void) {
     list_t *list;
 	list = (list_t*)malloc(sizeof(*list));
 	assert(list!=NULL);
 	list->head = list->tail = NULL;
+
 	return list;
 }
 
 
-// Adapted from listops.c
-// Credit: Alistair Moffat
+// Credit: Alistair Moffat, Adapted from 'listops.c'
 node_t 
 *create_node(char *str, int id) {
     node_t *node;
@@ -214,9 +228,31 @@ node_t
     return node;
 }
 
+/* returns a pointer to the start of the copied string
+*/
+char
+*copy_string(char *str) {
+    char *newstr;
+    newstr = (char*) malloc(sizeof(*str));
+    strcpy(newstr,str);
+    return newstr;
+}
+
+char
+*change_string_size(char *str, int new_length) {
+    return realloc(str, new_length);
+}
+
+char
+*create_string(int length) {
+    return (char*) malloc(sizeof(char) * length);
+}
+/*----------------------------------------------------------------------------*/
+
+
 /* when inserting ascii characters to the output list put them in sorted order 
-    REFERENCE: https://www.geeksforgeeks.org/given-a-linked-list-which-is-
-        sorted-how-will-you-insert-in-sorted-way/
+   REFERENCE: https://www.geeksforgeeks.org/given-a-linked-list-which-is-sorted
+   how-will-you-insert-in-sorted-way/
 */
 state_t 
 *sorted_list_insert(automaton_t *automaton, state_t *state, char *str) {
@@ -231,28 +267,27 @@ state_t
         state->visited = true;
         return new_node->state;
     } 
-        
+    // as insertions to the linked list are unique don't check strcmp == 0
     if (strcmp(str, state->outputs->head->str) < 0) {
         // check if smaller than head and insert at head
         new_node->next = state->outputs->head;
         state->outputs->head = new_node;
         
     } else {
-        node_t *currentnode;      
-        currentnode = state->outputs->head;
+        node_t *current_node;      
+        current_node = state->outputs->head;
         
-        while(currentnode->next != NULL && 
-            strcmp(str, currentnode->next->str) > 0) {
-            currentnode = currentnode->next;
+        while(current_node->next != NULL && 
+            strcmp(str, current_node->next->str) > 0) {
+            current_node = current_node->next;
         }
-        new_node->next = currentnode->next;
-        currentnode->next = new_node;
+        new_node->next = current_node->next;
+        current_node->next = new_node;
 
     }
-    //print_state(automaton->ini,"insert sorted");
+
     return new_node->state;
 }
-
 
 
 state_t 
@@ -264,86 +299,166 @@ state_t
     node_t *current_node; 
     current_node = state->outputs->head;
 
-
-    
-    bool flag = (current_node != NULL) ? true : false;
-    while (flag){
+    while (current_node != NULL){
         if (!strcmp(current_node->str, str)) {
             state->freq += 1;
             //print_state(current_node->state);
             return current_node->state; 
         }
-        // guard clause
-        if (current_node->next == NULL) {
-            break;
-        }
         current_node = current_node->next;
     }
     // node with that string doesnt exist so make one
-    
     state_t *newstate;
-    //printf("new %s\n",newstr);
     newstate = sorted_list_insert(automaton, state, newstr);
-    //print_state(state,"insertstate");
     return newstate;
-
-           
 }
 
 
+/* returns the state which corresponds to the input string or NULL if it 
+   or null if it can't be found
+*/
+state_t
+*find_state_match(state_t *state, char *str) {
+    node_t *current_node;
+    current_node = state->outputs->head;
+    while(current_node != NULL) {
+        if (strcmp(current_node->str, str) == 0) {
+            return current_node->state;
+        }
+        current_node = current_node->next;
+    }
+    return NULL;
+}
+
+/* Because the output list for each state is sorted ASCII-beticaly, choose the 
+   rightmost occurance of the highest frequency. Operation is O(n)
+*/
+state_t 
+*select_next_state(state_t *state){
+    if (state->outputs->head == NULL) {
+        // linked list is empty so no next state.
+        return NULL;
+    }
+    node_t *largest_node, *current_node;
+    current_node = largest_node = state->outputs->head;
+    while(current_node != NULL) {   
+        if (current_node->state->freq >= largest_node->state->freq) {
+            largest_node = current_node;
+        }
+        current_node = current_node->next;
+    }
+    return largest_node->state;
+}
 
 int
 read_line_into_automaton(automaton_t *automaton, int *charcount) {
-    char c;
-    char str[2];
+    char c, str[2];
     state_t *current_state;
     current_state = automaton->ini; 
     bool flag = false;
     
     while (((c=mygetchar()) != EOF) && (c != '\n')) {
-        *charcount += 1;
-           
-            str[0] = c;
-            str[1] = NULTRM;
-            //printf("%s\n",str);
-            //print_state(automaton->ini,"readline");
-            current_state = insert_state(automaton, current_state, str);
-            //print_state(automaton->ini,"readlineafter");
-        
+        *charcount += 1;        
+        str[0] = c;
+        str[1] = NULTRM;
+        current_state = insert_state(automaton, current_state, str);
         flag = true;
     }
-    return (flag);
+    return flag;
 }
 
-void 
-replay(state_t *state) {
-
-
-
+void
+print_ellipses(int *char_count) {
+    int i = 0;
+    while (i < 3 && *char_count < 37) {
+        *char_count += 1;
+        printf(".");
+        i++;
+    }     
 }
+
+int 
+replay_automaton(automaton_t *automaton) {
+    char c;
+    char *str;
+    str = create_string(2);
+    int str_length = 2;
+    
+    int str_memory_allocated = 2;
+    int char_count = 0;
+    bool flag = false;
+
+    state_t *current_state;
+    current_state = automaton->ini; 
+
+    while (((c=mygetchar()) != EOF)) {
+        if (c == '\n') {
+            if (flag == true) {
+                print_ellipses(&char_count);
+                printf("\n");
+            }
+            break;
+            // return flag;
+        }
+        if ((current_state == NULL && char_count <= 37)) {
+            print_ellipses(&char_count);
+        }
+        flag = true;
+        *(str)= c;
+        *(str + 1)= '\0';
+       
+
+        current_state = find_state_match(current_state, str);
+        char_count++;
+        if (char_count <= 37) {
+            printf("%s",str);
+          //  printf(" %d\n",char_count);
+        }
+    }
+   
+    
+    if(char_count < 37 && flag == true) {
+        //select_next_state(state)
+
+    }
+   
+    return flag;
+}
+
 
 void 
 print_state(state_t *state, char *message){
-    printf("\n");
-    printf("%s\n",message);
+
+    printf("\n%s\n",message);
     printf("STATE-----------------\n");
     printf("id: %d\n",state->id);
     printf("freq: %d\n",state->freq);
     printf("visted: %d\n",state->visited);
-    node_t *currentnode;
-    currentnode = state->outputs->head;
-    
-    while(true){
-        printf("encoded state: %s\n",currentnode->str);
-        if (currentnode->next == NULL){
-            break;
-        }
-        currentnode = currentnode->next;
+    node_t *current_node;
+    current_node = state->outputs->head;
+    printf("encoded states: ");
+    while(current_node != NULL){
+        printf("%s-%d  ",current_node->str,current_node->state->freq);
+        current_node = current_node->next;
     }
-    printf("--------------------\n");
-    printf("\n");
+    printf("\n--------------------\n\n");
 
 }
+
+// void
+// iterate_through_list(void action(void*, void*), state_t *state, 
+//         void *actioninput , bool flag) {
+//     node_t *current_node;
+//     current_node = state->outputs->head;
+//     while(flag) {
+//         action(*actioninput, state);
+//         if (current_node->next == NULL) {
+//             break;
+//         }
+//         current_node = current_node->next;
+//     }
+// }
+
 
 
 

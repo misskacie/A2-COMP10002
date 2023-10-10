@@ -52,18 +52,39 @@ int mygetchar(void);
 int read_line(char *line, int maxlen);          // getchar() that skips carriage returns
 
 /* WHERE IT ALL HAPPENS ------------------------------------------------------*/
+char
+*copy_string(char *str) {
+    char *newstr;
+    newstr = (char*) malloc(sizeof(*str));
+    strcpy(newstr,str);
+    return newstr;
+}
+
+char
+*change_string_size(char *str, int new_length ) {
+    return realloc(str, new_length);
+}
+
+char
+*create_string(int length) {
+    return (char*) malloc(sizeof(char) * length);
+}
 
 
 int main(int argc, char *argv[]) {
-    char str[2] = "a";
-    char c = 'a';
-    char str2[2];
-    str2[0] = c;
-    str2[1] = NULLTERM;
-    if(!strcmp(str, str2)){
-        printf("success");
+    char *str;
+    str = create_string(100);
+    change_string_size(str, 10000);
+    *str = 'a';
+    *(str+1) = 'b';
+    *(str+2) = '\0';
+    for (int i; i < 10000; i++){
+        *(str+i) = 1;
+        printf("%c %d\n",*(str+i),i);
     }
-
+    printf("hi");
+    printf("%s\n",str);
+    printf("%d\n",strlen(str));
     return EXIT_SUCCESS;        // algorithms are fun!!!
 }
 
