@@ -1,4 +1,155 @@
-==STAGE 1============================
-Number of statements: 8
-Number of characters: 50
-Number of states: 29
+compressed
+STATE-----------------
+id: 0
+freq: 8
+visted: 1
+encoded states: He-4  Hi-4
+--------------------
+
+
+compressed
+STATE-----------------
+id: 2
+freq: 4
+visted: 0
+encoded states: l-1  y-2
+--------------------
+
+
+compressed
+STATE-----------------
+id: 18
+freq: 1
+visted: 1
+encoded states: lo-0
+--------------------
+
+
+compressed
+STATE-----------------
+id: 20
+freq: 0
+visted: 0
+encoded states:
+--------------------
+
+
+compressed
+STATE-----------------
+id: 3
+freq: 2
+visted: 1
+encoded states: #P-1  #y-1
+--------------------
+
+
+compressed
+STATE-----------------
+id: 5
+freq: 1
+visted: 1
+encoded states: rof-0
+--------------------
+
+
+compressed
+STATE-----------------
+id: 8
+freq: 0
+visted: 0
+encoded states:
+--------------------
+
+
+compressed
+STATE-----------------
+id: 26
+freq: 1
+visted: 1
+encoded states: ou-0
+--------------------
+
+
+compressed
+STATE-----------------
+id: 28
+freq: 0
+visted: 0
+encoded states:
+--------------------
+
+
+compressed
+STATE-----------------
+id: 9
+freq: 4
+visted: 1
+encoded states: #P-1  #S-2  #t-1
+--------------------
+
+
+compressed
+STATE-----------------
+id: 14
+freq: 1
+visted: 1
+encoded states: rof-0
+--------------------
+
+
+compressed
+STATE-----------------
+id: 17
+freq: 0
+visted: 0
+encoded states:
+--------------------
+
+
+compressed
+STATE-----------------
+id: 11
+freq: 2
+visted: 1
+encoded states: ir-0
+--------------------
+
+
+compressed
+STATE-----------------
+id: 13
+freq: 0
+visted: 0
+encoded states:
+--------------------
+
+
+compressed
+STATE-----------------
+id: 21
+freq: 1
+visted: 1
+encoded states: her-1
+--------------------
+
+
+compressed
+STATE-----------------
+id: 24
+freq: 1
+visted: 0
+encoded states: e-0
+--------------------
+
+
+compressed
+STATE-----------------
+id: 25
+freq: 0
+visted: 0
+encoded states:
+--------------------
+
+Number of states: 17
+Total frequency: 26
+==THE END============================

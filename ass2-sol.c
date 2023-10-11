@@ -59,6 +59,8 @@
 #define CRTRNC '\r'       // carriage return character
 #define NULTRM '\0' // used to mark the end of a string
 
+#define TRUNCATELENGTH 37
+
 #define TRUE 1
 #define FALSE 0
 
@@ -102,11 +104,13 @@ int read_line_into_automaton(automaton_t *automaton, int *charcount);
 void print_state(state_t *state, char *message);
 void recursive_traverse(state_t *state);
 void traverse_tree(state_t *state);
-int replay(automaton_t *automaton, state_t *state);
+int replay (automaton_t *automaton, state_t *current_state, state_t *tmp_state,
+    int *flag , int *char_count, char *str);
 state_t *find_state_match(state_t *state, char *str);
 node_t *select_next_state(state_t *state);
 int traverse_state(state_t *state, char *str);
 int replay_automaton(automaton_t *automaton);
+int replay_automaton2(automaton_t *automaton);
 char *change_string_size(char *str, int new_length);
 char *create_string(int length);
 char *string_concat(char *str1, char *str2);
@@ -138,7 +142,7 @@ main(int argc, char *argv[]) {
    
 
     printf(SDELIM, 1);
-    while(replay_automaton(automaton)){
+    while(replay_automaton2(automaton)){
         printf("\n");
     }
 
@@ -151,10 +155,14 @@ main(int argc, char *argv[]) {
     perform_compressions(automaton, &stage2_freq_count, &stage2_state_count);
     //find_next_compression(automaton->ini);
     //compress_automaton(automaton, &stage2_freq_count);
-    recursive_traverse(automaton->ini);
+    //recursive_traverse(automaton->ini);
 
     printf(NPSFMT, stage2_state_count);
     printf(TFQFMT, stage2_freq_count);
+    printf(MDELIM);
+    while(replay_automaton2(automaton)){
+        printf("\n");
+    }
     
     free_automaton(automaton);
     printf(THEEND);
@@ -430,69 +438,133 @@ read_line_into_automaton(automaton_t *automaton, int *charcount) {
 void
 print_ellipses(int *char_count) {
     int i = 0;
-    while (i < 3 && *char_count < 37) {
+    while (i < 3 && *char_count < TRUNCATELENGTH) {
         *char_count += 1;
         printf(".");
         i++;
-    }     
+    }    
 }
 
 int 
-replay_automaton(automaton_t *automaton) {
-    char c;
-    char *str;
+replay (automaton_t *automaton, state_t *current_state, state_t *tmp_state,
+    int *flag , int *char_count, char *str) {
+    //printf("STR: %s\n",str);
+    int output = FALSE;
+    //print_state(current_state, "currstate");
+    if(*char_count < TRUNCATELENGTH && *flag == TRUE && current_state == tmp_state) {
+        
+        
+        node_t *current_node;
+        
+        current_node = select_next_state(current_state);
+        while((current_node != NULL)){
+            printf("%s",current_node->str);
+            output = TRUE;
+            current_node = select_next_state(current_node->state);
+        }
+    }
+   // printf("----%d----",output);
+    if (output == FALSE){
+       // printf("\n");
+        return 0;
+    }
+    return 1;
+}
+
+
+int 
+replay_automaton2(automaton_t *automaton) {
+    char c, *str;
     str = create_string(2);
-    int str_length = 2;
-    
-    int str_memory_allocated = 2;
-    int char_count = 0;
-    int flag = FALSE;
+    int str_length = 2, str_memory_allocated = 2, char_count = 0, flag = FALSE;
 
     state_t *current_state, *tmp_state;
     current_state = tmp_state = automaton->ini; 
     
     while (((c=mygetchar()) != EOF)) {
+        if (char_count >= TRUNCATELENGTH) {
+            if (c == '\n'){
+                break;
+            }
+            printf("\n %c %d",c,char_count);
+            continue;
+        }
         if (c == '\n') {
             if (flag == TRUE) {
                 print_ellipses(&char_count);
-                
+                replay(automaton, current_state, tmp_state, &flag , &char_count, str);
             }
+           
             break;
             // return flag;
         }
-        if ((tmp_state == NULL && char_count < 37)) {
-            print_ellipses(&char_count);
-            
-        }
-        flag = TRUE;
-        *(str)= c;
-        *(str + 1)= '\0';
-       
         
-        tmp_state = find_state_match(current_state, str);
-        if (tmp_state != NULL) {
-            current_state = tmp_state;
+        if ((tmp_state == NULL && char_count <= TRUNCATELENGTH)) {
+            
+            print_ellipses(&char_count);
+            replay(automaton, current_state, tmp_state, &flag , &char_count, str);
         }
 
-        
-        if (char_count < 37) {
-            printf("%s",str);
-          //  printf(" %d\n",char_count);
-        }
-        char_count++;
-    }
-    
-    
-    if(char_count < 37 && flag == TRUE && current_state == tmp_state) {
-        
-        node_t *current_node;
-        current_node = select_next_state(current_state);
-        while((current_node != NULL)){
-            printf("%s",current_node->str);
+        if (char_count < TRUNCATELENGTH){
+            *(str)= c;
+            *(str + 1)= '\0';
+            flag = TRUE;
             
-            current_node = select_next_state(current_node->state);
-         }
+            int i = 1;
+            //printf("\nSTR: %s\n",str);
+            tmp_state = find_state_match(current_state, str);
+        // printf("\nPTR: %p\n",tmp_state);
+            
+            while (tmp_state == NULL && (c=mygetchar()) != '\n'){
+                if (str_length == str_memory_allocated){
+                    str_memory_allocated *= 2;
+                    change_string_size(str,str_memory_allocated);
+                }
+                str_length++;
+                *(str + i)= c;
+                *(str + 1 + i)= '\0';
+                i++;
+                tmp_state = find_state_match(current_state, str);
+                char_count++;
+                if (tmp_state == NULL){
+                    printf("%c",*str);
+                    current_state = tmp_state = automaton->ini; 
+                    print_ellipses(&char_count);
+                    //printf("\n");
+                    if (c == '\n'){
+                        break;
+                    }
+                }
+                
+            }
+            if (char_count >= TRUNCATELENGTH) {
+                if (c == '\n'){
+                    break;
+                }
+                printf("%d",char_count);
+                continue;
+            }
         
+            char_count++;
+
+            if (char_count <= TRUNCATELENGTH) {
+                printf("%s",str);
+                
+            }
+            //printf("%c %d\n",c, char_count);
+            if (tmp_state != NULL) {
+                current_state = tmp_state;
+                
+            } else {
+                current_state = tmp_state = automaton->ini; 
+                print_ellipses(&char_count);
+                break;
+               // printf("\n");
+            }
+
+            
+        }
+    
     }
     
     free(str);
@@ -508,16 +580,11 @@ state_t
     current_node = state->outputs->head;
 
     if (current_node != NULL && target == NULL) {
-     //   printf("%p %p--------------------------\n\n\n",state->outputs->head,
-      //  state->outputs->tail);
-        //print_state(state, "thonk");
+
         if (state->outputs->head == state->outputs->tail &&
             current_node->state->outputs->head != NULL) {
-                    //
+                    
             state->visited = TRUE;
-            // if (current_node->state->freq == 0){
-            //     state->visited = FALSE;
-            // }
             target = state;
         }
 
@@ -542,12 +609,10 @@ compress_automaton(automaton_t *automaton, int *freq_count) {
     top_state = find_next_compression(automaton->ini, top_state);
     //print_state(top_state, "hmmmm");
     if (top_state == NULL) {
-        printf("oop\n");
         return 0;
     }
 
     bottom_state = top_state->outputs->head->state;
-    
     *freq_count -= bottom_state->freq;
     //print_state(top_state);
 
@@ -557,8 +622,6 @@ compress_automaton(automaton_t *automaton, int *freq_count) {
     
     free(bottom_state);
      
-    
-
     //iterate through each node and concat the string identifiers
     node_t *current_node;
     current_node = top_state->outputs->head;
@@ -586,14 +649,11 @@ perform_compressions(automaton_t *automaton, int *freq_count, int *state_count) 
     int compression_steps = atoi(str);
     
     i = 0;
-    //compression_steps = 2;
     while(i < compression_steps){
-        i++;
-        printf("hmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm\n\n");
         if (!compress_automaton(automaton, freq_count)){
             break;
         }
-        
+        i++;
     }
     *state_count -= i;
 }
