@@ -40,7 +40,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <assert.h>
 #include <string.h>
 #include <unistd.h>
@@ -56,8 +55,12 @@
 #define TFQFMT "Total frequency: %d\n"                      // total frequency
 
 #define ROOTID 0
+#define MAXINTDIGITS 10
 #define CRTRNC '\r'       // carriage return character
 #define NULTRM '\0' // used to mark the end of a string
+
+#define TRUE 1
+#define FALSE 0
 
 /* TYPE DEFINITIONS ----------------------------------------------------------*/
 typedef struct state state_t;   // a state in an automaton
@@ -77,7 +80,7 @@ typedef struct {                // a linked list consists of
 struct state {                  // a state in an automaton is characterized by
     unsigned int    id;         // ... an identifier,
     unsigned int    freq;       // ... frequency of traversal,
-    bool            visited;    // ... visited status flag, and
+    int             visited;    // ... visited status flag, and
     list_t*         outputs;    // ... a list of output states.
 };
 
@@ -102,15 +105,18 @@ void traverse_tree(state_t *state);
 int replay(automaton_t *automaton, state_t *state);
 state_t *find_state_match(state_t *state, char *str);
 node_t *select_next_state(state_t *state);
-bool traverse_state(state_t *state, char *str);
+int traverse_state(state_t *state, char *str);
 int replay_automaton(automaton_t *automaton);
 char *change_string_size(char *str, int new_length);
 char *create_string(int length);
+char *string_concat(char *str1, char *str2);
 void print_ellipses(int *char_count);
-int compress_automaton(automaton_t *automaton);
-void find_next_compression(state_t *state);
+state_t *find_next_compression(state_t *state, state_t *target);
+int compress_automaton(automaton_t *automaton, int *freq_count);
 void free_automaton(automaton_t *automaton);
 void recursive_free_automaton(state_t *state);
+void perform_compressions(automaton_t *automaton, 
+    int *freq_count, int *state_count);
 /*----------------------------------------------------------------------------*/
 
 int 
@@ -118,6 +124,8 @@ main(int argc, char *argv[]) {
     automaton_t *automaton;
     automaton = init_automaton();
     int stage0_char_count = 0;
+    int stage2_state_count = 0;
+    int stage2_freq_count = 0;
 
 
     printf(SDELIM, 0);
@@ -126,8 +134,8 @@ main(int argc, char *argv[]) {
     printf(NOCFMT, stage0_char_count);
     printf(NPSFMT,automaton->nid);
 
-    
-    //recursive_traverse(automaton->ini);
+    //print_state(find_next_compression(automaton->ini),"thing");
+   
 
     printf(SDELIM, 1);
     while(replay_automaton(automaton)){
@@ -135,8 +143,21 @@ main(int argc, char *argv[]) {
     }
 
     printf(SDELIM, 2);
+    // freq for uncompressed automaton == number of chars in input 
+    stage2_freq_count = stage0_char_count; 
+    stage2_state_count = automaton->nid;
+    //recursive_traverse(automaton->ini);
+    //printf("--------- compress-------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
+    perform_compressions(automaton, &stage2_freq_count, &stage2_state_count);
+    //find_next_compression(automaton->ini);
+    //compress_automaton(automaton, &stage2_freq_count);
+    recursive_traverse(automaton->ini);
+
+    printf(NPSFMT, stage2_state_count);
+    printf(TFQFMT, stage2_freq_count);
     
     free_automaton(automaton);
+    printf(THEEND);
     return EXIT_SUCCESS;        // algorithms are fun!!!
 }
 
@@ -158,7 +179,8 @@ void
 recursive_traverse(state_t *state) {
 	node_t *current_node;
     current_node = state->outputs->head;
-    printf("%d\n", state->id);
+    //printf("%d\n", state->id);
+    print_state(state, "compressed");
     if (current_node) {
         while(current_node != NULL){
             recursive_traverse(current_node->state);
@@ -190,7 +212,7 @@ state_t
 
     state->freq = 0;
     state->id = id;
-    state->visited = false;
+    state->visited = FALSE;
     state->outputs = create_list();
     
     return state;
@@ -243,8 +265,22 @@ char
     return (char*) malloc(sizeof(char) * size);
 }
 
+
+// return a pointer to a new string which is concat of the two inputs 
+// by first creating a new string pointer which can be used
+char
+*string_concat(char *str1, char *str2) {
+    char *rtr_str;
+    rtr_str = (char*) malloc(sizeof(char)*(sizeof(*str1)+sizeof(*str2)));
+    strcpy(rtr_str, str1);
+    strcat(rtr_str, str2);
+    free(str2);
+    return rtr_str;
+}
+
+
 // Credit: Alistair Moffat, Adapted from 'treeops.c'
-// Wrapper function to free the automaton type
+// Wrapper function to also free the automaton type
 void
 free_automaton(automaton_t *automaton){
     assert(automaton != NULL);
@@ -263,6 +299,7 @@ recursive_free_automaton(state_t *state) {
             recursive_free_automaton(current_node->state);
             tmp = current_node;
             current_node = current_node->next;
+            free(tmp->str);
             free(tmp);
         }
 	}
@@ -286,7 +323,6 @@ state_t
     if (state->outputs->tail == NULL){
         //first insertion
         state->outputs->head = state->outputs->tail = new_node;
-        state->visited = true;
         return new_node->state;
     } 
     // as insertions to the linked list are unique don't check strcmp == 0
@@ -305,6 +341,7 @@ state_t
         }
         new_node->next = current_node->next;
         current_node->next = new_node;
+        state->outputs->tail = new_node;
 
     }
 
@@ -317,14 +354,13 @@ state_t
     char *newstr;
     newstr = (char*) malloc(2*sizeof(*newstr));
     strcpy(newstr,str);
-
     node_t *current_node; 
     current_node = state->outputs->head;
 
     while (current_node != NULL){
         if (!strcmp(current_node->str, str)) {
             state->freq += 1;
-            //print_state(current_node->state);
+            free(newstr);
             return current_node->state; 
         }
         current_node = current_node->next;
@@ -341,6 +377,7 @@ state_t
 */
 state_t
 *find_state_match(state_t *state, char *str) {
+    assert(state != NULL);
     node_t *current_node;
     current_node = state->outputs->head;
     while(current_node != NULL) {
@@ -357,6 +394,7 @@ state_t
 */
 node_t 
 *select_next_state(state_t *state){
+    assert(state != NULL);
     if (state->outputs->head == NULL) {
         // linked list is empty so no next state.
         return NULL;
@@ -377,14 +415,14 @@ read_line_into_automaton(automaton_t *automaton, int *charcount) {
     char c, str[2];
     state_t *current_state;
     current_state = automaton->ini; 
-    bool flag = false;
+    int flag = FALSE;
     
     while (((c=mygetchar()) != EOF) && (c != '\n')) {
         *charcount += 1;        
         str[0] = c;
         str[1] = NULTRM;
         current_state = insert_state(automaton, current_state, str);
-        flag = true;
+        flag = TRUE;
     }
     return flag;
 }
@@ -408,14 +446,14 @@ replay_automaton(automaton_t *automaton) {
     
     int str_memory_allocated = 2;
     int char_count = 0;
-    bool flag = false;
+    int flag = FALSE;
 
     state_t *current_state, *tmp_state;
     current_state = tmp_state = automaton->ini; 
     
     while (((c=mygetchar()) != EOF)) {
         if (c == '\n') {
-            if (flag == true) {
+            if (flag == TRUE) {
                 print_ellipses(&char_count);
                 
             }
@@ -426,7 +464,7 @@ replay_automaton(automaton_t *automaton) {
             print_ellipses(&char_count);
             
         }
-        flag = true;
+        flag = TRUE;
         *(str)= c;
         *(str + 1)= '\0';
        
@@ -445,7 +483,7 @@ replay_automaton(automaton_t *automaton) {
     }
     
     
-    if(char_count < 37 && flag == true && current_state == tmp_state) {
+    if(char_count < 37 && flag == TRUE && current_state == tmp_state) {
         
         node_t *current_node;
         current_node = select_next_state(current_state);
@@ -457,31 +495,113 @@ replay_automaton(automaton_t *automaton) {
         
     }
     
-   
+    free(str);
     return flag;
 }
-// currenlty just the same as recursive traverse
-void
-find_next_compression(state_t *state) {
+
+// Adapted version from Alistair Moffat's recursive traverse in treeops.c
+// Assumes a low->high sorted ASCII-betically connections linked list and 
+// iterates through each output to find the next valid state to compress
+state_t
+*find_next_compression(state_t *state, state_t *target) {
 	node_t *current_node;
     current_node = state->outputs->head;
-    printf("%d\n", state->id);
-    if (current_node) {
-        while(current_node != NULL){
-            recursive_traverse(current_node->state);
+
+    if (current_node != NULL && target == NULL) {
+     //   printf("%p %p--------------------------\n\n\n",state->outputs->head,
+      //  state->outputs->tail);
+        //print_state(state, "thonk");
+        if (state->outputs->head == state->outputs->tail &&
+            current_node->state->outputs->head != NULL) {
+                    //
+            state->visited = TRUE;
+            // if (current_node->state->freq == 0){
+            //     state->visited = FALSE;
+            // }
+            target = state;
+        }
+
+        while(current_node != NULL && target == NULL){
+            //printf("functioncall made\n");
+            target = find_next_compression(current_node->state, target);
             current_node = current_node->next;
         }
 	}
+    return target;
 }
 
+
+
+// the arc to compress is the first item of the output list as it is sorted
+// ASCII-betically
 int 
-compress_aautomaton(automaton_t *automaton) {
+compress_automaton(automaton_t *automaton, int *freq_count) {
+    state_t *top_state, *bottom_state;
+    top_state = NULL;
+   // printf("callmade-----------------------------\n");
+    top_state = find_next_compression(automaton->ini, top_state);
+    //print_state(top_state, "hmmmm");
+    if (top_state == NULL) {
+        printf("oop\n");
+        return 0;
+    }
+
+    bottom_state = top_state->outputs->head->state;
+    
+    *freq_count -= bottom_state->freq;
+    //print_state(top_state);
+
+    list_t *tmp;
+    tmp = top_state->outputs;
+    top_state->outputs = bottom_state->outputs;
+    
+    free(bottom_state);
+     
+    
+
+    //iterate through each node and concat the string identifiers
+    node_t *current_node;
+    current_node = top_state->outputs->head;
+    while(current_node != NULL) {
+        current_node->str = string_concat(tmp->head->str, current_node->str);
+       
+        current_node = current_node->next;
+    }
+    free(tmp->head->str);
+    free(tmp);
+
+    return 1;
+}
+
+void 
+perform_compressions(automaton_t *automaton, int *freq_count, int *state_count) {
+    char *str, c;
+    str = create_string(MAXINTDIGITS+1);
+    int i = 0;
+    while ((c = mygetchar()) && c != '\n' && i < MAXINTDIGITS){
+        *(str+i) = c;
+        i++;
+    }
+    *(str+i) = '\0';
+    int compression_steps = atoi(str);
+    
+    i = 0;
+    //compression_steps = 2;
+    while(i < compression_steps){
+        i++;
+        printf("hmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm\n\n");
+        if (!compress_automaton(automaton, freq_count)){
+            break;
+        }
+        
+    }
+    *state_count -= i;
 }
 
 
 void 
 print_state(state_t *state, char *message){
-
+    assert(state != NULL);
     printf("\n%s\n",message);
     printf("STATE-----------------\n");
     printf("id: %d\n",state->id);
@@ -495,7 +615,7 @@ print_state(state_t *state, char *message){
         current_node = current_node->next;
     }
     printf("\n--------------------\n\n");
-
+    free(current_node);
 }
 
 // void

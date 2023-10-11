@@ -71,20 +71,35 @@ char
 }
 
 
+char
+*string_concat(char *str1, char *str2) {
+    str1 = realloc(str1, sizeof(char)*(sizeof(*str1)+sizeof(*str2)));
+    strcat(str1, str2);
+    free(str2);
+    return str1;
+}
+
+
 int main(int argc, char *argv[]) {
-    char *str;
-    str = create_string(100);
-    change_string_size(str, 10000);
+    char *str, *str2;
+    str = create_string(3);
+    str2 = create_string(10);
+
     *str = 'a';
     *(str+1) = 'b';
     *(str+2) = '\0';
-    for (int i; i < 10000; i++){
-        *(str+i) = 1;
-        printf("%c %d\n",*(str+i),i);
+    for (int i; i <= 8; i++){
+        *(str2+i) = 86;
+       // printf("%c %d\n",*(str+i),i);
     }
-    printf("hi");
-    printf("%s\n",str);
-    printf("%d\n",strlen(str));
+    *(str2+9) = '\0';
+
+    string_concat(str,str2);
+    printf("%s",str);
+  
+    // printf("hi");
+    // printf("%s\n",str);
+    // printf("%d\n",strlen(str));
     return EXIT_SUCCESS;        // algorithms are fun!!!
 }
 
