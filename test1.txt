@@ -13,7 +13,7 @@ Hello
 Hi#A
 Hi#Ar
 Hi#Al
-This is a prompt that exceeds the length of the output linef
+This is a prompt that exceeds the length of the output line
 He
 
 5
