@@ -119,6 +119,7 @@ void free_automaton(automaton_t *automaton);
 void recursive_free_automaton(state_t *state);
 void perform_compressions(automaton_t *automaton, 
     int *freq_count, int *state_count);
+node_t *find_substring(state_t *state, char *str);
 /*----------------------------------------------------------------------------*/
 
 int 
@@ -378,22 +379,7 @@ state_t
 }
 
 
-/* returns the state which corresponds to the input string or NULL if it 
-   or null if it can't be found
-*/
-state_t
-*find_state_match(state_t *state, char *str) {
-    assert(state != NULL);
-    node_t *current_node;
-    current_node = state->outputs->head;
-    while(current_node != NULL) {
-        if (strcmp(current_node->str, str) == 0) {
-            return current_node->state;
-        }
-        current_node = current_node->next;
-    }
-    return NULL;
-}
+
 
 /* Because the output list for each state is sorted ASCII-beticaly, choose the 
    rightmost occurance of the highest frequency. Operation is O(n)
@@ -533,10 +519,43 @@ print_ellipses(int *char_count) {
     }    
 }
 
+/* returns the state which corresponds to the input string or NULL if it 
+   or null if it can't be found
+*/
+state_t
+*find_state_match(state_t *state, char *str) {
+    assert(state != NULL);
+    node_t *current_node;
+    current_node = state->outputs->head;
+    while(current_node != NULL) {
+        if (strcmp(current_node->str, str) == 0) {
+            return current_node->state;
+        }
+        current_node = current_node->next;
+    }
+    return NULL;
+}
+
+node_t
+*find_substring(state_t *state, char *str){
+  assert(state != NULL);
+    node_t *current_node, *found;
+    current_node = state->outputs->head;
+    found = NULL;
+    while(current_node != NULL) {
+        if (strstr(current_node->str, str) != NULL) {
+            // choose the rightmost occurance of the substring for asciibetical 
+            // reasons
+           found = current_node;
+        }
+        current_node = current_node->next;
+    }
+    return found;
+}
+
 int 
 replay(automaton_t *automaton, state_t *current_state, state_t *tmp_state,
     int *flag , int *char_count, char *str) {
-    //printf("STR: %s\n",str);
     int output = FALSE;
    // print_state(current_state, "currstate");
     if(*char_count < TRUNCATELENGTH && *flag == TRUE && current_state == tmp_state) {
@@ -550,7 +569,6 @@ replay(automaton_t *automaton, state_t *current_state, state_t *tmp_state,
     }
    // printf("----%d----",output);
     if (output == FALSE){
-        //printf("zzzzzzz\n");
         return 0;
     }
     return 1;
@@ -562,20 +580,33 @@ replay_automaton(automaton_t *automaton) {
     char c, *str;
     str = create_string(TRUNCATELENGTH+1);
     int str_length = 2, str_memory_allocated = 2, char_count = 0, flag = FALSE;
-
+    
     state_t *current_state, *tmp_state;
     current_state = tmp_state = automaton->ini; 
     int i = 0;
-    while (((c=mygetchar()) != EOF)) {
-        
-        if (c == '\n') {
-            if (flag == TRUE) {
+    while (c=mygetchar()) {
+        if (c == '\n' || c == EOF) {
+            if (flag == TRUE && char_count < TRUNCATELENGTH) {
+                node_t *found_node;
+                if ((found_node=find_substring(current_state, str)) != NULL && tmp_state == NULL){
+                        printf("%s",str);
+                        int max = strlen(found_node->str);
+                        int i = strlen(str);
+                        print_ellipses(&char_count);
+                        while(i < max){
+                            printf("%c",*(found_node->str+i));
+                        i++;
+                    }
+                    tmp_state= current_state = found_node->state;
+                    replay(automaton, current_state, tmp_state, &flag , &char_count, str);
+                    return flag;
+                }
                 print_ellipses(&char_count);
                 replay(automaton, current_state, tmp_state, &flag , &char_count, str);
             }
             return flag;
         }
-        
+
         *(str + i)= c;
         *(str + 1 + i)= '\0';
         i++;
