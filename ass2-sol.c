@@ -54,15 +54,19 @@
 #define NPSFMT "Number of states: %d\n"                   // no. of states
 #define TFQFMT "Total frequency: %d\n"                    // total frequency
 
-#define ROOTID 0
+#define ROOTID 0 //the id of the root state in an automaton
 #define MAXINTDIGITS 10 // Num digits that int type can hold without overflow
 #define CRTRNC '\r'     // carriage return character
 #define NULTRM '\0'     // used to mark the end of a string
-#define NULTRMSIZE 1
-#define TRUNCATELENGTH 37
+#define NULTRMSIZE 1 // size in bytes of the NULTRM char
+#define TRUNCATELENGTH 37 // length to truncate the output line to when printing
+#define NUMELLIPSE 3 // number of '.' chars in an ellipse
 
-#define TRUE 1
-#define FALSE 0
+#define TRUE 1 // used to represent boolean logic
+#define FALSE 0 // used to represent boolean logic
+
+#define FOUND 1 // return value for functions that do a succesful search
+#define NOTFOUND 0 // return value for functions for an unsuccesful search
 
 /* TYPE DEFINITIONS ----------------------------------------------------------*/
 typedef struct state state_t; // a state in an automaton
@@ -92,9 +96,9 @@ typedef struct {      // an automaton consists of
 /* FUNCTION PROTOTYPES--------------------------------------------------------*/
 void print_stages(automaton_t *automaton, int *char_count, int *state_count,
                   int *freq_count);
-int mygetchar(void); // getchar() that skips carriage returns
-// MEMORY MANAGEMENT FUNCTIONS
-automaton_t *init_automaton(void); // initiliases the memory for automaton type
+
+// **** MEMORY MANAGEMENT FUNCTIONS ***** //
+automaton_t *init_automaton(void);  // initiliases the memory for automaton type
 state_t *create_state(int id); // initiliases the memory for state type
 list_t *create_list(void); // initiliases the memory for list type
 node_t *create_node(char *str, int id); // initiliases the memory for list type
@@ -104,32 +108,49 @@ char *string_concat(char *str1, char *str2); // return pointer to concat string
 void free_automaton(automaton_t *automaton); // free memory used by automaton
 void recursive_free_automaton(state_t *state); // recursive iter and free memory
 
+// **** AUTOMATON INSERTION FUNCTIONS **** //
+// getchar() that skips carriage returns
+int mygetchar(void);
 // Inserts items to a linked list ASCII-betical order of node string
 state_t *sorted_list_insert(automaton_t *automaton, state_t *state, char *str);
+// add a new state from input string or find existing state and increase freq
 state_t *insert_state(automaton_t *automaton, state_t *state, char *str);
-node_t *select_next_state(state_t *state);
+// returns the state matching the input string or NULL
 state_t *find_state_match(state_t *state, char *str);
-node_t *find_substring(state_t *state, char *str);
+// returns the node for which the input string is contained as substring
+node_t *find_substring_state_match(state_t *state, char *str);
+// Process each line from stdin into the automaton data structure
 int read_line_into_automaton(automaton_t *automaton, int *charcount);
+
+// **** AUTOMATON COMPRESSION FUNCTIONS **** //
+// wrapper function to call recursive_find_next_compression with initial values
+state_t *find_next_compression(automaton_t *automaton); 
+// pick the next state to compress
+state_t *recursive_find_next_compression(state_t *state, state_t *target);
+// update the automaton pointers, concatinate str identifiers to compress
+int perform_compressions(automaton_t *automaton, int *freq_count);
+// for a given automaton compress it n times as given in STDIN
+void compress_automaton(automaton_t *automaton, int *freq_count,
+                          int *state_count);
+// **** AUTOMATON REPLAY FUNCTIONS **** //
+// choose the next state for the replay of automaton
+node_t *select_next_state(state_t *state);
+// print the ellipses which occur at the end of the printed input string
 void print_ellipses(int *char_count);
-int generate_reply(automaton_t *automaton, state_t *current_state, state_t *tmp_state,
-           int *flag, int *char_count, char *str);
-int print_substring_state_match(automaton_t *automaton, state_t *current_state, 
+// generate the response for a given input string
+int generate_reply(state_t *current_state, 
+    state_t *tmp_state, int *flag, int *char_count, char *str);
+// special case to print output node for which the input string is a substring
+int print_substring_state_match(state_t *current_state, 
     state_t *tmp_state, char *str, int *char_count, int *flag);
+// For a given prompt, replay the automaton 
 int replay_automaton(automaton_t *automaton);
 
-state_t *find_next_compression(state_t *state, state_t *target);
-int compress_automaton(automaton_t *automaton, int *freq_count);
-void perform_compressions(automaton_t *automaton, int *freq_count,
-                          int *state_count);
-void print_state(state_t *state, char *message);
-
-/*----------------------------------------------------------------------------*/
+/* MAIN-----------------------------------------------------------------------*/
 int main(int argc, char *argv[]) {
     automaton_t *automaton;
     automaton = init_automaton();
     int char_count = 0, state_count = 0, freq_count = 0;
-
 
     print_stages(automaton, &char_count, &state_count, &freq_count);
     free_automaton(automaton);
@@ -160,7 +181,7 @@ void print_stages(automaton_t *automaton, int *char_count, int *state_count,
 
     // Stage 2
     printf(SDELIM, 2);
-    perform_compressions(automaton, freq_count, state_count);
+    compress_automaton(automaton, freq_count, state_count);
     printf(NPSFMT, *state_count);
     printf(TFQFMT, *freq_count);
     printf(MDELIM);
@@ -171,16 +192,6 @@ void print_stages(automaton_t *automaton, int *char_count, int *state_count,
     printf(THEEND);
 }
 
-/* USEFUL FUNCTIONS ----------------------------------------------------------*/
-
-// An improved version of getchar(); skips carriage return characters.
-// NB: Adapted version of the mygetchar() function by Alistair Moffat
-int mygetchar() {
-    int c;
-    while ((c = getchar()) == CRTRNC);
-    return c;
-}
-
 /*MEMORY MANAGEMENT FUNCTIONS-------------------------------------------------*/
 
 // Initialise the memory for the automaton type and set initial values
@@ -189,8 +200,8 @@ automaton_t *init_automaton(void) {
     automaton = (automaton_t *)malloc(sizeof(*automaton));
     assert(automaton != NULL);
 
-    automaton->ini = create_state(ROOTID); // root state has id 0
-    automaton->nid = 1;
+    automaton->ini = create_state(ROOTID); 
+    automaton->nid = ROOTID + 1;
     return automaton;
 }
 
@@ -238,9 +249,10 @@ char *copy_string(char *str) {
     return newstr;
 }
 
+// create a string which can store int length chars and a NULTRM char
 char *create_string(int length) { 
     return (char *)malloc(sizeof(char) * length + NULTRMSIZE); 
-    }
+}
 
 // return pointer to a new string which is a concatanation of the input strings
 // only free's str2 to prevent needing to copy str2 in the usage context
@@ -283,7 +295,14 @@ void recursive_free_automaton(state_t *state) {
     free(state);
 }
 
-/*----------------------------------------------------------------------------*/
+/* AUTOMATON INSERTION FUNCTIONS----------------------------------------------*/
+// An improved version of getchar(); skips carriage return characters.
+// NB: Adapted version of the mygetchar() function by Alistair Moffat
+int mygetchar() {
+    int c;
+    while ((c = getchar()) == CRTRNC);
+    return c;
+}
 
 // when inserting ASCII characters to the output list put them in ASCII-betical
 // order so that other operations are easier
@@ -339,22 +358,6 @@ state_t *insert_state(automaton_t *automaton, state_t *state, char *str) {
     return newstate;
 }
 
-// Because the output list for each state is sorted ASCII-beticaly, choose the
-// rightmost occurance of the highest frequency. 
-node_t *select_next_state(state_t *state) {
-    assert(state != NULL);
-
-    node_t *largest_node, *current_node;
-    current_node = largest_node = state->outputs->head;
-    // find the node of highest frequency and highest string ASCII number
-    while (current_node != NULL) {
-        if (current_node->state->freq >= largest_node->state->freq) {
-            largest_node = current_node;
-        }
-        current_node = current_node->next;
-    }
-    return largest_node;
-}
 
 // Add states to the automaton for a given input line
 int read_line_into_automaton(automaton_t *automaton, int *charcount) {
@@ -372,10 +375,17 @@ int read_line_into_automaton(automaton_t *automaton, int *charcount) {
     return flag;
 }
 
+/* AUTOMATON COMPRESSION FUNCTIONS--------------------------------------------*/
+
+// wrapper function to call recursive_find_next_compression with initial values
+state_t *find_next_compression(automaton_t *automaton){
+    return recursive_find_next_compression(automaton->ini, NULL); 
+}
+
 // Adapted version from Alistair Moffat's recursive traverse in treeops.c
 // Assumes a low->high sorted ASCII-betically connections linked list and
 // iterates through each output to find the next valid state to compress
-state_t *find_next_compression(state_t *state, state_t *target) {
+state_t *recursive_find_next_compression(state_t *state, state_t *target) {
     node_t *current_node;
     current_node = state->outputs->head;
     if (current_node != NULL && target == NULL) {
@@ -384,20 +394,20 @@ state_t *find_next_compression(state_t *state, state_t *target) {
             target = state;
         }
         while (current_node != NULL && target == NULL) {
-            target = find_next_compression(current_node->state, target);
+            target = recursive_find_next_compression(current_node->state, target);
             current_node = current_node->next;
         }
     }
     return target;
 }
-
+// update automaton pointers, concatinate str identifiers and free unused states
 // the arc to compress is the first item of the output list as it is sorted
 // ASCII-betically
-int compress_automaton(automaton_t *automaton, int *freq_count) {
+int perform_compressions(automaton_t *automaton, int *freq_count) {
     state_t *top_state, *bottom_state;
-    top_state = find_next_compression(automaton->ini, NULL);
+    top_state = find_next_compression(automaton);
     if (top_state == NULL) {
-        return 0;
+        return NOTFOUND;
     }
     bottom_state = top_state->outputs->head->state;
     *freq_count -= bottom_state->freq; // as bottom_state will be removed
@@ -416,33 +426,54 @@ int compress_automaton(automaton_t *automaton, int *freq_count) {
     free(tmp->head->str);
     free(tmp->head);
     free(tmp);
-    return 1;
+    return FOUND;
 }
 
-void perform_compressions(automaton_t *automaton, int *freq_count,
+// for a given automaton compress it n times as given in STDIN
+void compress_automaton(automaton_t *automaton, int *freq_count,
                           int *state_count) {
     char str[MAXINTDIGITS+NULTRMSIZE], c;
     int i = 0;
+    // input the number of compression steps from STDIN
     while ((c = mygetchar()) && c != '\n' && i < MAXINTDIGITS) {
         str[0 + i] = c;
         i++;
     }
     str[0 + i] = NULTRM;
+    // convert number of compression steps from string to int
     int compression_steps = atoi(str);
     i = 0;
     while (i < compression_steps) {
-        if (!compress_automaton(automaton, freq_count)) {
+        if (!perform_compressions(automaton, freq_count)) {
             break;
         }
         i++;
     }
     *state_count -= i;
 }
+/* REPLAY FUNCTIONS-----------------------------------------------------------*/
+
+// Because the output list for each state is sorted ASCII-beticaly, choose the
+// rightmost occurance of the highest frequency. 
+node_t *select_next_state(state_t *state) {
+    assert(state != NULL);
+
+    node_t *largest_node, *current_node;
+    current_node = largest_node = state->outputs->head;
+    // find the node of highest frequency and highest string ASCII number
+    while (current_node != NULL) {
+        if (current_node->state->freq >= largest_node->state->freq) {
+            largest_node = current_node;
+        }
+        current_node = current_node->next;
+    }
+    return largest_node;
+}
 
 // print the ellipses that follow the inputed line before the generated output
 void print_ellipses(int *char_count) {
     int i = 0;
-    while (i < 3 && *char_count < TRUNCATELENGTH) {
+    while (i < NUMELLIPSE && *char_count < TRUNCATELENGTH) {
         *char_count += 1;
         printf(".");
         i++;
@@ -467,7 +498,7 @@ state_t *find_state_match(state_t *state, char *str) {
 // Find whether the input string is a substring of a string corresponding
 // to a node and choose the most ASCII-betically high occurance. 
 // Return a Node if found or NULL
-node_t *find_substring(state_t *state, char *str) {
+node_t *find_substring_state_match(state_t *state, char *str) {
     assert(state != NULL);
     node_t *current_node, *found;
     current_node = state->outputs->head;
@@ -483,30 +514,35 @@ node_t *find_substring(state_t *state, char *str) {
     return found;
 }
 
-int print_substring_state_match(automaton_t *automaton, state_t *current_state, 
+// helper function for replay_automaton(), processes special case for when the
+// current state has an output node for which the input string is a substring
+int print_substring_state_match(state_t *current_state, 
 state_t *tmp_state, char *str, int *char_count, int *flag){
     node_t *found_node;
     found_node = NULL;
-    if ((found_node = find_substring(current_state, str)) != NULL &&
+    if ((found_node = find_substring_state_match(current_state, str)) != NULL &&
         tmp_state == NULL) {
+        // print the substring
         printf("%s", str);
         print_ellipses(char_count);
         int max = strlen(found_node->str);
         int i = strlen(str);
+        //print the remaining characters not in the substring but in the state
         while (i < max) {
             printf("%c", *(found_node->str + i));
             i++;
         }
+        //now generate reply as normal
         tmp_state = current_state = found_node->state;
-        generate_reply(automaton, current_state, tmp_state, flag,
-                char_count, str);
-        return 1;
+        generate_reply(current_state, tmp_state, flag, char_count, str);
+        return FOUND;
     }
-    return 0;
+    return NOTFOUND;
 }
 
-//
-int generate_reply(automaton_t *automaton, state_t *current_state, state_t *tmp_state,
+// print the next string encoded into the automaton according to which arc has 
+// the highest frequency and ASCII-betical ordering
+int generate_reply(state_t *current_state, state_t *tmp_state,
            int *flag, int *char_count, char *str) {
     int output = FALSE;
 
@@ -527,7 +563,11 @@ int generate_reply(automaton_t *automaton, state_t *current_state, state_t *tmp_
     return 1;
 }
 
-// From a given inoput
+// For a given prompt, replay the automaton until the end of line or 
+// TRUNCATELENGTH chars are printed. If end of line is found before 
+// TRUNCATELENGTH is reached print an ellipse (...) and print the next string
+// encoded into the automaton according to which arc has the highest frequency
+// and ASCII-betical ordering
 int replay_automaton(automaton_t *automaton) {
     char c, str[TRUNCATELENGTH+NULTRMSIZE];
     // Max line width is TRUNCATELENGTH so the output string for a line can be
@@ -542,8 +582,8 @@ int replay_automaton(automaton_t *automaton) {
         if (c == '\n' || c == EOF) {
             // special case for when the current state has an output
             // node for which the input string is a substring
-            if (print_substring_state_match(automaton, current_state, 
-                        tmp_state, str, &char_count, &flag)) {
+            if (print_substring_state_match(current_state, tmp_state,
+                        str, &char_count, &flag)) {
                     return flag;
                 }
             if (tmp_state == NULL) {
@@ -555,7 +595,7 @@ int replay_automaton(automaton_t *automaton) {
 
             if (flag == TRUE && char_count < TRUNCATELENGTH) {
                 print_ellipses(&char_count);
-                generate_reply(automaton, current_state, tmp_state, &flag, 
+                generate_reply(current_state, tmp_state, &flag, 
                    &char_count, str);
             }
             return flag;
