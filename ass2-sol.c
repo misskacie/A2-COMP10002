@@ -112,9 +112,12 @@ state_t *find_state_match(state_t *state, char *str);
 node_t *find_substring(state_t *state, char *str);
 int read_line_into_automaton(automaton_t *automaton, int *charcount);
 void print_ellipses(int *char_count);
-int replay(automaton_t *automaton, state_t *current_state, state_t *tmp_state,
+int generate_reply(automaton_t *automaton, state_t *current_state, state_t *tmp_state,
            int *flag, int *char_count, char *str);
+int print_substring_state_match(automaton_t *automaton, state_t *current_state, 
+    state_t *tmp_state, char *str, int *char_count, int *flag);
 int replay_automaton(automaton_t *automaton);
+
 state_t *find_next_compression(state_t *state, state_t *target);
 int compress_automaton(automaton_t *automaton, int *freq_count);
 void perform_compressions(automaton_t *automaton, int *freq_count,
@@ -161,6 +164,7 @@ void print_stages(automaton_t *automaton, int *char_count, int *state_count,
     printf(NPSFMT, *state_count);
     printf(TFQFMT, *freq_count);
     printf(MDELIM);
+    
     while (replay_automaton(automaton)) {
         printf("\n");
     }
@@ -479,7 +483,30 @@ node_t *find_substring(state_t *state, char *str) {
     return found;
 }
 
-int replay(automaton_t *automaton, state_t *current_state, state_t *tmp_state,
+int print_substring_state_match(automaton_t *automaton, state_t *current_state, 
+state_t *tmp_state, char *str, int *char_count, int *flag){
+    node_t *found_node;
+    found_node = NULL;
+    if ((found_node = find_substring(current_state, str)) != NULL &&
+        tmp_state == NULL) {
+        printf("%s", str);
+        print_ellipses(char_count);
+        int max = strlen(found_node->str);
+        int i = strlen(str);
+        while (i < max) {
+            printf("%c", *(found_node->str + i));
+            i++;
+        }
+        tmp_state = current_state = found_node->state;
+        generate_reply(automaton, current_state, tmp_state, flag,
+                char_count, str);
+        return 1;
+    }
+    return 0;
+}
+
+//
+int generate_reply(automaton_t *automaton, state_t *current_state, state_t *tmp_state,
            int *flag, int *char_count, char *str) {
     int output = FALSE;
 
@@ -507,39 +534,33 @@ int replay_automaton(automaton_t *automaton) {
     int char_count = 0, flag = FALSE;
     state_t *current_state, *tmp_state;
     current_state = tmp_state = automaton->ini;
+    str[0] = NULTRM;
 
     int i = 0;
     while ((c = mygetchar())) {
         if (c == '\n' || c == EOF) {
+            // special case for when the current state has an output
+            // node for which the input string is a substring
+            if (print_substring_state_match(automaton, current_state, 
+                        tmp_state, str, &char_count, &flag)) {
+                    return flag;
+                }
             if (tmp_state == NULL) {
                 printf("%c", *(str));
                 // char_count has increased above TRUNCATE LENGTH because
-                // the loop runs to delete excess chars
+                // the loop runs to delete excess chars so set it back
                 char_count -= (strlen(str) - 1);
             }
+
             if (flag == TRUE && char_count < TRUNCATELENGTH) {
-                node_t *found_node;
-                if ((found_node = find_substring(current_state, str)) != NULL &&
-                    tmp_state == NULL) {
-                    printf("%s", str);
-                    print_ellipses(&char_count);
-                    int max = strlen(found_node->str);
-                    int i = strlen(str);
-                    while (i < max) {
-                        printf("%c", *(found_node->str + i));
-                        i++;
-                    }
-                    tmp_state = current_state = found_node->state;
-                    replay(automaton, current_state, tmp_state, &flag,
-                           &char_count, str);
-                    return flag;
-                }
                 print_ellipses(&char_count);
-                replay(automaton, current_state, tmp_state, &flag, &char_count,
-                       str);
+                generate_reply(automaton, current_state, tmp_state, &flag, 
+                   &char_count, str);
             }
             return flag;
         }
+        // only add to the input string if less than the line length
+        // to prevent overindexing the string
         if (char_count < TRUNCATELENGTH) {
             str[0 + i] = c;
             str[1 + i] = NULTRM;
