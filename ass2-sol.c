@@ -527,6 +527,7 @@ int generate_reply(automaton_t *automaton, state_t *current_state, state_t *tmp_
     return 1;
 }
 
+// From a given inoput
 int replay_automaton(automaton_t *automaton) {
     char c, str[TRUNCATELENGTH+NULTRMSIZE];
     // Max line width is TRUNCATELENGTH so the output string for a line can be
