@@ -1,0 +1,2 @@
+This goal of this assignment was to demonstrate understanding of dynamic memory and linked data structures and extend program design, testing, and debugging skills. I implemented a simple algorithm for generating text based on the context provided by input prompt. 
+This was done using a finite state automata with any number of leaf nodes allowed to be attached to a node which was then compressed by a number of compression steps to make a simplified automaton and replayed from the input prompts. 
